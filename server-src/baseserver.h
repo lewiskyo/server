@@ -1,9 +1,8 @@
 #ifndef BASESERVER_H
 #define BASESERVER_H
 
-
-
 #include "socketevent.h"
+#include "luavm.h"
 
 using namespace std;
 
@@ -20,6 +19,7 @@ private:
 	int loopInterval;  // 单位为毫秒
 
 	SocketEvent* socketEvent;
+    LuaVm* vm;
 
 };
 

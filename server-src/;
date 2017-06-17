@@ -1,0 +1,82 @@
+#include "luavm.h"
+
+static int _cb(LuaVm* vm, int type, int session, int source, const void* msg, int sz){
+   lua_State *L = vm->L;
+   int trace = 1;
+   int r;
+   int top = lua_gettop(L);
+   if (top == 0){
+       lua_pushcfuntion(L, traceback);
+       lua_rawgetp(LUA_REGISTRYINDEX, _cb);
+   } else {
+       assert( r == 2);
+   }
+   lua_pushvalue(L, 2);
+
+   lua_pushinteger(L, type);
+   //lua_pushlightuserdata(L, (char*) msg);
+   lua_pushlightuserdata(L, (char*) msg);
+
+}
+
+int LuaVm::traceback(lua_State* L){
+    const char *msg = lua_tostring(L,-1);
+    if (msg)
+        luaL_traceback(L,L,msg,1);
+    else 
+        lua_pushliteral(L, "(no message)");
+
+    return 1;
+}
+
+int LuaVm::lcallback(lua_State* L){
+    luaL_checktype(L,1,LUA_TFUNCTION);
+    lua_settop(L,1);
+    lua_rawsetp(L, LUA_REGISTRYINDEX, _cb);
+    
+    return 0;
+}
+
+void LuaVm::registFuncToLua(){
+    luaL_checkversion(L);
+    
+    luaL_Reg l[] = {
+        {"callback", lcallback },
+        {"cast", lcast },
+    }
+}
+
+void LuaVm::init(){
+    L = luaL_newstate();
+    lua_gc(L,LUA_GCSTOP,0);
+    luaL_openlibs(L);
+
+    // init cb
+    const char *path = "./lua-script/?.lua;./lua-script/?/?.lua";
+    lua_pushstring(L, path);
+    lua_setglobal(L,"LUA_PATH");
+    
+    const char *cpath = "./lua-clib/?.so;";
+    lua_pushstring(L, cpath);
+    lua_setglobal(L,"LUA_CPATH");
+
+    lua_pushcfunction(L, traceback);
+    assert(lua_gettop(L) == 1);
+
+    const char *loader = "./lua-script/loader.lua";
+
+    int r = luaL_loadfile(L, loader);
+    if (r != LUA_OK) {
+        printf("can not load loader, reason: %s", lua_tostring(L,-1));
+        return;
+    }
+
+    r = lua_pcall(L,1,0,1);
+    if (r != LUA_OK) {
+        printf("lua loader error: reason: %s", lua_tostring(L, -1));
+        return;
+    }
+
+    lua_settop(0);
+    // init loader ==> bootstrap ==> require lua_clib ==> reg cb
+}
